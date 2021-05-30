@@ -157,23 +157,20 @@ int Calculator::Calculate (Node<CalcNodeData>* node_cur)
     case NODE_OPERATOR:
 
         Calculate(node_cur->right_);
-
-        if (node_cur->left_ != nullptr)
-            Calculate(node_cur->left_);
-
         assert(node_cur->right_->getData().node_type == NODE_NUMBER);
-
-        if (node_cur->left_ != nullptr)
-        {
-            assert(node_cur->left_->getData().node_type == NODE_NUMBER);
-        }
 
         err = sscanf(node_cur->right_->getData().op.word, NUM_PRINT_FORMAT, &right_num);
         assert(err);
 
         if (node_cur->left_ != nullptr)
-        err = sscanf(node_cur->left_->getData().op.word,  NUM_PRINT_FORMAT, &left_num);
-        assert(err);
+        {
+            Calculate(node_cur->left_);
+            assert(node_cur->left_->getData().node_type == NODE_NUMBER);
+
+            err = sscanf(node_cur->left_->getData().op.word, NUM_PRINT_FORMAT, &left_num);
+            assert(err);
+        }
+        else left_num = 0;
 
         switch (node_cur->getData().op.code)
         {
