@@ -156,17 +156,22 @@ int Calculator::Calculate (Node<CalcNodeData>* node_cur)
 
     case NODE_OPERATOR:
 
-        assert((node_cur->right_ != nullptr) && (node_cur->left_ != nullptr));
-
         Calculate(node_cur->right_);
-        Calculate(node_cur->left_);
+
+        if (node_cur->left_ != nullptr)
+            Calculate(node_cur->left_);
 
         assert(node_cur->right_->getData().node_type == NODE_NUMBER);
-        assert(node_cur->left_->getData().node_type == NODE_NUMBER);
+
+        if (node_cur->left_ != nullptr)
+        {
+            assert(node_cur->left_->getData().node_type == NODE_NUMBER);
+        }
 
         err = sscanf(node_cur->right_->getData().op.word, NUM_PRINT_FORMAT, &right_num);
         assert(err);
 
+        if (node_cur->left_ != nullptr)
         err = sscanf(node_cur->left_->getData().op.word,  NUM_PRINT_FORMAT, &left_num);
         assert(err);
 
@@ -184,9 +189,12 @@ int Calculator::Calculate (Node<CalcNodeData>* node_cur)
         delete node_cur->right_;
         node_cur->right_ = nullptr;
 
-        node_cur->left_->~Node();
-        delete node_cur->left_;
-        node_cur->left_ = nullptr;
+        if (node_cur->left_ != nullptr)
+        {
+            node_cur->left_->~Node();
+            delete node_cur->left_;
+            node_cur->left_ = nullptr;
+        }
 
         sprintf(num_str, NUM_PRINT_FORMAT, number);
 
