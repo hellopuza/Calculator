@@ -16,7 +16,6 @@ Calculator::Calculator () :
     filename_     (nullptr),
     tree_         ((char*)"expression"),
     variables_    ((char*)"variables"),
-    path2badnode_ ((char*)"path2badnode_"),
     state_        (CALC_OK)
 {}
 
@@ -26,7 +25,6 @@ Calculator::Calculator (char* filename) :
     filename_     (filename),
     tree_         (GetTrueFileName(filename)),
     variables_    ((char*)"variables"),
-    path2badnode_ ((char*)"path2badnode_"),
     state_        (CALC_OK)
 {}
 
@@ -67,6 +65,7 @@ int Calculator::Run ()
                 Calculate(tree_.root_);
                 Write();
             }
+
             tree_.Clean();
             variables_.Clean();
 
@@ -156,12 +155,6 @@ int Calculator::Calculate (Node<CalcNodeData>* node_cur)
 
     case NODE_OPERATOR:
 
-        Calculate(node_cur->right_);
-        assert(node_cur->right_->getData().node_type == NODE_NUMBER);
-
-        err = sscanf(node_cur->right_->getData().op.word, NUM_PRINT_FORMAT, &right_num);
-        assert(err);
-
         if (node_cur->left_ != nullptr)
         {
             Calculate(node_cur->left_);
@@ -171,6 +164,12 @@ int Calculator::Calculate (Node<CalcNodeData>* node_cur)
             assert(err);
         }
         else left_num = 0;
+
+        Calculate(node_cur->right_);
+        assert(node_cur->right_->getData().node_type == NODE_NUMBER);
+
+        err = sscanf(node_cur->right_->getData().op.word, NUM_PRINT_FORMAT, &right_num);
+        assert(err);
 
         switch (node_cur->getData().op.code)
         {
@@ -252,7 +251,7 @@ void Calculator::Write ()
 
 //------------------------------------------------------------------------------
 
-void PrintError (const char* logname, const char* file, int line, const char* function, int err)
+void CalcPrintError (const char* logname, const char* file, int line, const char* function, int err, bool console_err)
 {
     assert(function != nullptr);
     assert(logname  != nullptr);
@@ -269,6 +268,9 @@ void PrintError (const char* logname, const char* file, int line, const char* fu
             tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
     fprintf(log, "ERROR: file %s  line %d  function %s\n\n", file, line, function);
     fprintf(log, "%s\n", calc_errstr[err + 1]);
+
+    if (console_err)
+        printf(  "ERROR: file %s  line %d  function %s\n\n", file, line, function);
 
     printf (     "ERROR: %s\n\n", calc_errstr[err + 1]);
 }
@@ -368,6 +370,127 @@ char* ScanExpr ()
 
 //------------------------------------------------------------------------------
 
+int Tree2Expr (Tree<CalcNodeData>& tree, Expression& expr)
+{
+    expr.symb_cur = expr.str;
+
+    int err = Node2Str(tree.root_, &expr.symb_cur);
+    CALC_ASSERTOK(err, err);
+
+    expr.symb_cur = expr.str;
+
+    return err;
+}
+
+//------------------------------------------------------------------------------
+
+int Node2Str (Node<CalcNodeData>* node_cur, char** str)
+{
+    assert(node_cur != nullptr);
+
+    int err = 0;
+
+    switch (node_cur->getData().node_type)
+    {
+    case NODE_FUNCTION:
+
+        if ((node_cur->right_ == nullptr) || (node_cur->left_ != nullptr))
+            return CALC_TREE_FUNC_WRONG_ARGUMENT;
+
+        sprintf(*str, node_cur->getData().op.word);
+        *str += strlen(node_cur->getData().op.word);
+
+        sprintf(*str, "(");
+        *str += 1;
+
+        err = Node2Str(node_cur->right_, str);
+        if (err) return err;
+
+        sprintf(*str, ")");
+        *str += 1;
+        break;
+
+    case NODE_OPERATOR:
+
+        if ((node_cur->right_ == nullptr) ||
+            (node_cur->left_  == nullptr) && (node_cur->getData().op.code != OP_SUB))
+            return CALC_TREE_OPER_WRONG_ARGUMENTS;
+
+        if (  ( ((node_cur->       getData().op.code == OP_MUL) || (node_cur->       getData().op.code == OP_DIV)) &&
+                ((node_cur->left_->getData().op.code == OP_ADD) || (node_cur->left_->getData().op.code == OP_SUB))   ) ||
+
+              ( (node_cur->getData().op.code == OP_POW)                 &&
+                (node_cur->left_->getData().node_type == NODE_OPERATOR) &&
+                (node_cur->left_->getData().op.code != OP_POW)            )  )
+        {
+            sprintf(*str, "(");
+            *str += 1;
+
+            if (node_cur->left_ != nullptr)
+            {
+                err = Node2Str(node_cur->left_, str);
+                if (err) return err;
+            }
+
+            sprintf(*str, ")");
+            *str += 1;
+        }
+        else
+        if (node_cur->left_ != nullptr)
+        {
+            err = Node2Str(node_cur->left_, str);
+            if (err) return err;
+        }
+
+        sprintf(*str, node_cur->getData().op.word);
+        *str += 1;
+
+        if (  ( ((node_cur->        getData().op.code == OP_MUL) || (node_cur->        getData().op.code == OP_DIV)) &&
+                ((node_cur->right_->getData().op.code == OP_ADD) || (node_cur->right_->getData().op.code == OP_SUB))   ) ||
+
+              ( (node_cur->getData().op.code == OP_POW)                  &&
+                (node_cur->right_->getData().node_type == NODE_OPERATOR) &&
+                (node_cur->right_->getData().op.code != OP_POW)            )  )
+        {
+            sprintf(*str, "(");
+            *str += 1;
+
+            err = Node2Str(node_cur->right_, str);
+            if (err) return err;
+
+            sprintf(*str, ")");
+            *str += 1;
+        }
+        else
+        {
+            err = Node2Str(node_cur->right_, str);
+            if (err) return err;
+        }
+        break;
+    
+    case NODE_VARIABLE:
+
+        if ((node_cur->right_ != nullptr) || (node_cur->left_ != nullptr))
+            return CALC_TREE_VAR_WRONG_ARGUMENT;
+    
+    case NODE_NUMBER:
+
+        if ((node_cur->right_ != nullptr) || (node_cur->left_ != nullptr))
+            return CALC_TREE_NUM_WRONG_ARGUMENT;
+
+        sprintf(*str, node_cur->getData().op.word);
+        *str += strlen(node_cur->getData().op.word);
+
+        break;
+
+    default: assert(0);
+    }
+
+    return CALC_OK;
+}
+
+//------------------------------------------------------------------------------
+
 int Expr2Tree (Expression& expr, Tree<CalcNodeData>& tree)
 {
     assert(expr.str != nullptr);
@@ -375,7 +498,7 @@ int Expr2Tree (Expression& expr, Tree<CalcNodeData>& tree)
     del_spaces(expr.str);
     str_tolower(expr.str);
 
-    tree.root_ = pass_Plus_Minus(tree, expr);
+    tree.root_ = pass_Plus_Minus(expr);
     if (tree.root_ == nullptr) return -1;
 
     tree.root_->recountPrev();
@@ -386,7 +509,7 @@ int Expr2Tree (Expression& expr, Tree<CalcNodeData>& tree)
 
 //------------------------------------------------------------------------------
 
-Node<CalcNodeData>* pass_Plus_Minus (Tree<CalcNodeData>& tree, Expression& expr)
+Node<CalcNodeData>* pass_Plus_Minus (Expression& expr)
 {
     Node<CalcNodeData>* node_cur = nullptr;
 
@@ -394,13 +517,13 @@ Node<CalcNodeData>* pass_Plus_Minus (Tree<CalcNodeData>& tree, Expression& expr)
     {   
         ++expr.symb_cur;
 
-        Node<CalcNodeData>* right = pass_Mul_Div(tree, expr);
+        Node<CalcNodeData>* right = pass_Mul_Div(expr);
 
         node_cur = new Node<CalcNodeData>;
         node_cur->setData({op_names[OP_SUB], NODE_OPERATOR});
         node_cur->right_ = right;
     }
-    else node_cur = pass_Mul_Div(tree, expr);
+    else node_cur = pass_Mul_Div(expr);
     
     while ( (*expr.symb_cur == '+') ||
             (*expr.symb_cur == '-')   )
@@ -409,7 +532,7 @@ Node<CalcNodeData>* pass_Plus_Minus (Tree<CalcNodeData>& tree, Expression& expr)
         ++expr.symb_cur;
 
         Node<CalcNodeData>* left  = node_cur;
-        Node<CalcNodeData>* right = pass_Mul_Div(tree, expr);
+        Node<CalcNodeData>* right = pass_Mul_Div(expr);
 
         node_cur = new Node<CalcNodeData>;
         node_cur->setData({op_names[(*symb_cur == '-') ? OP_SUB : OP_ADD], NODE_OPERATOR});
@@ -431,9 +554,9 @@ Node<CalcNodeData>* pass_Plus_Minus (Tree<CalcNodeData>& tree, Expression& expr)
 
 //------------------------------------------------------------------------------
 
-Node<CalcNodeData>* pass_Mul_Div (Tree<CalcNodeData>& tree, Expression& expr)
+Node<CalcNodeData>* pass_Mul_Div (Expression& expr)
 {
-    Node<CalcNodeData>* node_cur = pass_Power(tree, expr);
+    Node<CalcNodeData>* node_cur = pass_Power(expr);
 
     while ( (*expr.symb_cur == '*') ||
             (*expr.symb_cur == '/')   )
@@ -442,7 +565,7 @@ Node<CalcNodeData>* pass_Mul_Div (Tree<CalcNodeData>& tree, Expression& expr)
         ++expr.symb_cur;
 
         Node<CalcNodeData>* left  = node_cur;
-        Node<CalcNodeData>* right = pass_Power(tree, expr);
+        Node<CalcNodeData>* right = pass_Power(expr);
 
         node_cur = new Node<CalcNodeData>;
         node_cur->setData({op_names[(*symb_cur == '*') ? OP_MUL : OP_DIV], NODE_OPERATOR});
@@ -455,16 +578,16 @@ Node<CalcNodeData>* pass_Mul_Div (Tree<CalcNodeData>& tree, Expression& expr)
 
 //------------------------------------------------------------------------------
 
-Node<CalcNodeData>* pass_Power (Tree<CalcNodeData>& tree, Expression& expr)
+Node<CalcNodeData>* pass_Power (Expression& expr)
 {
-    Node<CalcNodeData>* node_cur = pass_Brackets(tree, expr);
+    Node<CalcNodeData>* node_cur = pass_Brackets(expr);
 
     while (*expr.symb_cur == '^')
     {
         ++expr.symb_cur;
 
         Node<CalcNodeData>* left  = node_cur;
-        Node<CalcNodeData>* right = pass_Power(tree, expr);
+        Node<CalcNodeData>* right = pass_Power(expr);
 
         node_cur = new Node<CalcNodeData>;
         node_cur->setData({op_names[OP_POW], NODE_OPERATOR});
@@ -477,13 +600,13 @@ Node<CalcNodeData>* pass_Power (Tree<CalcNodeData>& tree, Expression& expr)
 
 //------------------------------------------------------------------------------
 
-Node<CalcNodeData>* pass_Brackets (Tree<CalcNodeData>& tree, Expression& expr)
+Node<CalcNodeData>* pass_Brackets (Expression& expr)
 {
     if (*expr.symb_cur == '(')
     {
         ++expr.symb_cur;
 
-        Node<CalcNodeData>* node_cur = pass_Plus_Minus(tree, expr);
+        Node<CalcNodeData>* node_cur = pass_Plus_Minus(expr);
 
         CHECK_SYNTAX((*expr.symb_cur != ')'), CALC_SYNTAX_NO_CLOSE_BRACKET, expr, 1);
         ++expr.symb_cur;
@@ -491,14 +614,14 @@ Node<CalcNodeData>* pass_Brackets (Tree<CalcNodeData>& tree, Expression& expr)
         return node_cur;
     }
 
-    else return pass_Function(tree, expr);
+    else return pass_Function(expr);
 }
 
 //------------------------------------------------------------------------------
 
-Node<CalcNodeData>* pass_Function (Tree<CalcNodeData>& tree, Expression& expr)
+Node<CalcNodeData>* pass_Function (Expression& expr)
 {
-    if (isdigit(*expr.symb_cur)) return pass_Number(tree, expr);
+    if (isdigit(*expr.symb_cur)) return pass_Number(expr);
 
     else
     {
@@ -522,7 +645,7 @@ Node<CalcNodeData>* pass_Function (Tree<CalcNodeData>& tree, Expression& expr)
             Expression old = { expr.str, expr.symb_cur - index };
             CHECK_SYNTAX((code == 0), CALC_SYNTAX_UNIDENTIFIED_FUNCTION, old, index);
 
-            Node<CalcNodeData>* arg = pass_Brackets(tree, expr);
+            Node<CalcNodeData>* arg = pass_Brackets(expr);
 
             Node<CalcNodeData>* node_cur = new Node<CalcNodeData>;
             node_cur->setData({op_names[code], NODE_FUNCTION});
@@ -542,7 +665,7 @@ Node<CalcNodeData>* pass_Function (Tree<CalcNodeData>& tree, Expression& expr)
 
 //------------------------------------------------------------------------------
 
-Node<CalcNodeData>* pass_Number (Tree<CalcNodeData>& tree, Expression& expr)
+Node<CalcNodeData>* pass_Number (Expression& expr)
 {
     double value = 0;
     char* begin = expr.symb_cur;

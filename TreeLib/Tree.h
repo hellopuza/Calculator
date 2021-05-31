@@ -60,8 +60,7 @@ struct Node
 {
 private:
 
-    template <typename TYPE>
-    friend class Tree;
+    friend class Tree<TYPE>;
 
     TYPE data_       = POISON<TYPE>;
     bool is_dynamic_ = false;

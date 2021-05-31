@@ -53,6 +53,10 @@ enum CalculatorErrors
     CALC_SYNTAX_NO_CLOSE_BRACKET                                           ,
     CALC_SYNTAX_NUMER_ERROR                                                ,
     CALC_SYNTAX_UNIDENTIFIED_FUNCTION                                      ,
+    CALC_TREE_FUNC_WRONG_ARGUMENT                                          ,
+    CALC_TREE_NUM_WRONG_ARGUMENT                                           ,
+    CALC_TREE_OPER_WRONG_ARGUMENTS                                         ,
+    CALC_TREE_VAR_WRONG_ARGUMENT                                           ,
 };
 
 static const char* calc_errstr[] =
@@ -67,21 +71,25 @@ static const char* calc_errstr[] =
     "Close bracket \')\' required here"                                    ,
     "Wrong number"                                                         ,
     "Unidentified function"                                                ,
+    "Function node must have one children on the right branch"             ,
+    "Number node must not have any children"                               ,
+    "Operator node must have two children"                                 ,
+    "Variable node must not have any children"                             ,
 };
 
 static const char* CALCULATOR_LOGNAME = "calculator.log";
 
-#define CHECK_SYNTAX(cond, err, expr, len) if (cond)                                                                   \
-                                           {                                                                           \
-                                               PrintError(CALCULATOR_LOGNAME, __FILE__, __LINE__, __FUNC_NAME__, err); \
-                                               PrintBadExpr(CALCULATOR_LOGNAME, expr, len);                            \
-                                               return 0;                                                               \
+#define CHECK_SYNTAX(cond, err, expr, len) if (cond)                                                                          \
+                                           {                                                                                  \
+                                               CalcPrintError(CALCULATOR_LOGNAME, __FILE__, __LINE__, __FUNC_NAME__, err, 0); \
+                                               PrintBadExpr(CALCULATOR_LOGNAME, expr, len);                                   \
+                                               return 0;                                                                      \
                                            }
 
-#define CALC_ASSERTOK(cond, err) if (cond)                                                                 \
-                                 {                                                                         \
-                                   PrintError(CALCULATOR_LOGNAME, __FILE__, __LINE__, __FUNC_NAME__, err); \
-                                   exit(err);                                                              \
+#define CALC_ASSERTOK(cond, err) if (cond)                                                                        \
+                                 {                                                                                \
+                                   CalcPrintError(CALCULATOR_LOGNAME, __FILE__, __LINE__, __FUNC_NAME__, err, 1); \
+                                   exit(err);                                                                     \
                                  }
 
 
@@ -135,8 +143,6 @@ bool isPOISON  (Variable value);
 void TypePrint (FILE* fp, const Variable& var);
 
 
-
-
 class Calculator
 {
 private:
@@ -146,8 +152,6 @@ private:
 
     Tree<CalcNodeData> tree_;
     Stack<Variable>    variables_;
-
-    Stack<char*> path2badnode_;
 
 public:
 
@@ -217,14 +221,15 @@ private:
 //------------------------------------------------------------------------------
 /*! @brief   Prints an error wih description to the console and to the log file.
  *
- *  @param   logname     Name of the log file
- *  @param   file        Name of the program file
- *  @param   line        Number of line with an error
- *  @param   function    Name of the function with an error
- *  @param   err         Error code
+ *  @param   logname      Name of the log file
+ *  @param   file         Name of the program file
+ *  @param   line         Number of line with an error
+ *  @param   function     Name of the function with an error
+ *  @param   err          Error code
+ *  @param   console_err  Print error to console or not
  */
 
-void PrintError (const char* logname, const char* file, int line, const char* function, int err);
+void CalcPrintError (const char* logname, const char* file, int line, const char* function, int err, bool console_err);
 
 //------------------------------------------------------------------------------
 /*! @brief   Get an answer from stdin (yes or no).
@@ -251,6 +256,28 @@ NUM_TYPE scanNum ();
 char* ScanExpr ();
 
 //------------------------------------------------------------------------------
+/*! @brief   Convert tree to string expression.
+ * 
+ *  @param   tree        Equation tree
+ *  @param   expr        String expression
+ *
+ *  @return  error code
+ */
+
+int Tree2Expr (Tree<CalcNodeData>& tree, Expression& expr);
+
+//------------------------------------------------------------------------------
+/*! @brief   Convert tree node to string expression.
+ * 
+ *  @param   node_cur    Current node
+ *  @param   str         C string
+ *
+ *  @return  error code
+ */
+
+int Node2Str (Node<CalcNodeData>* node_cur, char** str);
+
+//------------------------------------------------------------------------------
 /*! @brief   Convert string expression to tree.
  * 
  *  @param   expr        String expression
@@ -264,68 +291,62 @@ int Expr2Tree (Expression& expr, Tree<CalcNodeData>& tree);
 //------------------------------------------------------------------------------
 /*! @brief   Parsing of expression beginning with plus and minus signs.
  * 
- *  @param   tree        Equation tree
  *  @param   expr        String expression
  *
  *  @return  error code
  */
 
-Node<CalcNodeData>* pass_Plus_Minus (Tree<CalcNodeData>& tree, Expression& expr);
+Node<CalcNodeData>* pass_Plus_Minus (Expression& expr);
 
 //------------------------------------------------------------------------------
 /*! @brief   Parsing of expression with mulptiply and division signs.
  * 
- *  @param   tree        Equation tree
  *  @param   expr        String expression
  *
  *  @return  error code
  */
 
-Node<CalcNodeData>* pass_Mul_Div (Tree<CalcNodeData>& tree, Expression& expr);
+Node<CalcNodeData>* pass_Mul_Div (Expression& expr);
 
 //------------------------------------------------------------------------------
 /*! @brief   Parsing of expression with power signs.
  * 
- *  @param   tree        Equation tree
  *  @param   expr        String expression
  *
  *  @return  error code
  */
 
-Node<CalcNodeData>* pass_Power (Tree<CalcNodeData>& tree, Expression& expr);
+Node<CalcNodeData>* pass_Power (Expression& expr);
 
 //------------------------------------------------------------------------------
 /*! @brief   Parsing of expression with brackets.
  * 
- *  @param   tree        Equation tree
  *  @param   expr        String expression
  *
  *  @return  error code
  */
 
-Node<CalcNodeData>* pass_Brackets (Tree<CalcNodeData>& tree, Expression& expr);
+Node<CalcNodeData>* pass_Brackets (Expression& expr);
 
 //------------------------------------------------------------------------------
 /*! @brief   Parsing of expression with function.
  * 
- *  @param   tree        Equation tree
  *  @param   expr        String expression
  *
  *  @return  error code
  */
 
-Node<CalcNodeData>* pass_Function (Tree<CalcNodeData>& tree, Expression& expr);
+Node<CalcNodeData>* pass_Function (Expression& expr);
 
 //------------------------------------------------------------------------------
 /*! @brief   Parsing of expression with number.
  * 
- *  @param   tree        Equation tree
  *  @param   expr        String expression
  *
  *  @return  error code
  */
 
-Node<CalcNodeData>* pass_Number (Tree<CalcNodeData>& tree, Expression& expr);
+Node<CalcNodeData>* pass_Number (Expression& expr);
 
 //------------------------------------------------------------------------------
 /*! @brief   Function identifier.
