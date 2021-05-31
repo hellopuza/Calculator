@@ -264,7 +264,7 @@ char* ScanExpr ();
  *  @return  error code
  */
 
-int Tree2Expr (Tree<CalcNodeData>& tree, Expression& expr);
+int Tree2Expr (const Tree<CalcNodeData>& tree, Expression& expr);
 
 //------------------------------------------------------------------------------
 /*! @brief   Convert tree node to string expression.

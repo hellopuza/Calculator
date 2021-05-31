@@ -370,7 +370,7 @@ char* ScanExpr ()
 
 //------------------------------------------------------------------------------
 
-int Tree2Expr (Tree<CalcNodeData>& tree, Expression& expr)
+int Tree2Expr (const Tree<CalcNodeData>& tree, Expression& expr)
 {
     expr.symb_cur = expr.str;
 
