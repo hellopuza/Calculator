@@ -6,14 +6,13 @@
     * Author:      Artem Puzankov                                              *
     * Email:       puzankov.ao@phystech.edu                                    *
     * GitHub:      https://github.com/hellopuza                                *
-    * Copyright © 2021 Artem Puzankov. All rights reserved.                    *
+    * Copyright Â© 2021 Artem Puzankov. All rights reserved.                    *
     *///------------------------------------------------------------------------
 
 #ifndef CALCULATOR_H_INCLUDED
 #define CALCULATOR_H_INCLUDED
 
 #define _CRT_SECURE_NO_WARNINGS
-//#define NDEBUG
 
 
 #if defined (__GNUC__) || defined (__clang__) || defined (__clang_major__)
@@ -123,7 +122,7 @@ struct CalcNodeData
     char node_type = 0;
 };
 
-template<> const char*            PRINT_TYPE<CalcNodeData> = "CalcNodeData";
+template<> const char* const      PRINT_TYPE<CalcNodeData> = "CalcNodeData";
 template<> constexpr CalcNodeData POISON    <CalcNodeData> = {};
 
 bool isPOISON  (CalcNodeData value);
@@ -136,7 +135,7 @@ struct Variable
     const char* name = nullptr;
 };
 
-template<> const char*        PRINT_TYPE<Variable> = "Variable";
+template<> const char* const  PRINT_TYPE<Variable> = "Variable";
 template<> constexpr Variable POISON    <Variable> = {};
 
 bool isPOISON  (Variable value);
