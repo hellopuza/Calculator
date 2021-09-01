@@ -3,7 +3,7 @@
 CC = g++
 CFLAGS = -c -O3 -std=c++17
 LDFLAGS =
-SOURCES = main.cpp StringLib/StringLib.cpp StackLib/hash.cpp Calculator/Calculator.cpp
+SOURCES = main.cpp StringLib/StringLib.cpp Calculator/Calculator.cpp
 OBJECTS = $(SOURCES:.cpp=.o)
 EXECUTABLE = .bin/Calculator
 
